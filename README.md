@@ -1,14 +1,7 @@
 # container-log-collector
 
 
-네, 문석님 👍 지금까지 만든 흐름을 바탕으로 깔끔한 **README.md** 초안을 작성해드릴게요.
-이 README는 그대로 GitHub에 올려도 되고, 나중에 다이어그램이나 예시 스크린샷만 추가하면 완성도가 올라갑니다.
 
----
-
-# 📄 README.md
-
-```markdown
 # 🐳 Docker Log Collector (with Bash + Cron + Awk)
 
 이 프로젝트는 **Filebeat 같은 무거운 에이전트 없이**,  
@@ -44,6 +37,9 @@ docker-log-project/
 
 ## 🚀 설치 & 실행
 
+
+
+
 ### 1. 저장소 클론
 ```bash
 git clone https://github.com/<username>/docker-log-project.git
@@ -68,8 +64,80 @@ crontab -e
 # 매 1분마다 로그 수집
 * * * * * /home/ubuntu/docker-log-project/container-log-collect.sh
 
+```
+
+
+```
+BASE_DIR="/home/ubuntu/docker-log-project"     # 프로젝트 기본 디렉토리
+OFFSET_DIR="$BASE_DIR/offsets"                 # 컨테이너별 offset 저장 디렉토리
+LOG_DIR="$BASE_DIR/logs"                       # 수집된 로그 저장 디렉토리
+TODAY=$(date +%F)                              # 오늘 날짜 (YYYY-MM-DD 형식)
+
+# 디렉토리 생성 (없으면 자동 생성)
+mkdir -p "$OFFSET_DIR" "$LOG_DIR"
+
+# 실행 중인 모든 컨테이너 순회
+for cid in $(docker ps -q); do
+    # 컨테이너 전체 ID (64자짜리)
+    fullid=$(docker inspect --format '{{.Id}}' $cid)
+    # 컨테이너 이름 (앞의 / 제거)
+    cname=$(docker inspect --format '{{.Name}}' $cid | sed 's#^/##')
+
+    # 컨테이너 로그 파일 경로 (json-file 로그 드라이버 기준)
+    clog="/var/lib/docker/containers/$fullid/${fullid}-json.log"
+
+    # 오늘 날짜 기준 아웃풋 로그 파일
+    outfile="$LOG_DIR/${cname}-all-$TODAY.log"
+
+    # offset 기록 파일 (마지막으로 읽은 바이트 위치 저장)
+    offset_file="$OFFSET_DIR/${fullid}.offset"
+
+    # 처음 실행 시 offset 파일이 없으면 현재 로그 파일 크기를 저장
+    # → 이미 있는 이전 로그는 건너뛰고 새로 쌓이는 부분부터 수집 시작
+    if [ ! -f "$offset_file" ]; then
+        wc -c < "$clog" > "$offset_file"
+    fi
+
+    # 마지막으로 읽은 위치(바이트 단위) 불러오기
+    last_offset=$(cat "$offset_file")
+
+    # 로그 파일에서 last_offset 이후의 새로운 데이터만 tail로 읽기
+    tail -c +$((last_offset+1)) "$clog" \
+      | awk '{
+          # 각 줄에 수집 시각을 붙여서 출력
+          cmd="date +\"[%Y-%m-%d %H:%M:%S]\""
+          cmd | getline ts
+          close(cmd)
+          print ts, $0
+        }' >> "$outfile"
+
+    # 로그 파일의 현재 전체 크기를 offset으로 갱신
+    # → 다음 실행 때는 여기서부터 이어서 읽음
+    new_offset=$(wc -c < "$clog")
+    echo "$new_offset" > "$offset_file"
+done
+```
+
+```
 # 매 정각 리포트 생성
-0 * * * * /home/ubuntu/docker-log-project/container-log-split.sh
+59 23 * * * /home/ubuntu/docker-log-project/container-log-report.sh
+```
+
+```
+#!/bin/bash
+BASE="$HOME/docker-log-project"
+LOGDIR="$BASE/logs"
+REPORTDIR="$BASE/reports"
+TODAY=$(date +%F)
+DST="$REPORTDIR/$TODAY"
+mkdir -p "$DST"
+# 오늘자 모든 로그 합치기
+cat $LOGDIR/*-error-$TODAY.log > "$DST/all-errors.log"
+# 에러 키워드별 분리
+errors=("Error" "Failed" "CrashLoopBackOff" "OOMKilled")
+for err in "${errors[@]}"; do
+    grep -i "$err" "$DST/all-errors.log" > "$DST/${err}.txt"
+done
 ```
 
 ### 4. 실시간 모니터링
@@ -103,21 +171,20 @@ docker run -d --name crash-nginx nginx
 docker kill -s SIGKILL crash-nginx
 ```
 
-### 가짜 로그 삽입 (테스트용)
-
-```bash
-echo "[2025-09-05 21:00:00] [CONTAINER:web01] ERROR: Simulated failure" \
-  >> logs/web01-error-$(date +%F).log
-```
-
 ---
 
-## 📌 참고 사항
+## 🛠️ 트러블슈팅
 
-* 로그 소스
+### 중복 로그 저장 문제
+처음에는 `container-log-collect.sh`를 크론으로 분 단위 실행했을 때,  
+같은 로그가 여러 번 중복 저장되는 문제가 있었습니다.  
 
-  * 컨테이너 stdout/stderr → `/var/lib/docker/containers/<CID>/<CID>-json.log`
-  * 컨테이너 이벤트 로그 → `journalctl -u docker.service`
-* offset 기반으로 동작하므로, 이미 처리된 로그는 중복 기록되지 않음
-* 단순 학습/테스트 목적이면 echo 로 가짜 로그를 넣어도 됩니다
+이유는 각 실행마다 `docker logs`가 이전 로그까지 모두 다시 읽어오기 때문입니다.  
+
+### 해결 방법: 컨테이너별 Offset 관리
+- 컨테이너별로 마지막으로 읽은 타임스탬프(`offsets/CONTAINER_ID.last`)를 기록  
+- 다음 실행 시 `--since <last_timestamp>` 옵션을 적용하여,  
+  이전에 수집한 로그 이후의 부분만 가져오도록 개선했습니다.  
+
+이를 통해 크론 기반 주기 실행에서도 **중복 없이 로그를 수집**할 수 있게 되었습니다.
 
