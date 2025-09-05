@@ -33,11 +33,18 @@
 2. **에러 패턴별 분류**  
    - `Error`, `Failed`, `CrashLoopBackOff`, `OOMKilled` 등 주요 패턴을 자동으로 필터링해  
      별도 리포트 파일로 정리합니다.  
-   - 이를 통해 운영자는 원하는 유형의 문제만 빠르게 찾아볼 수 있습니다.  
+   - 이를 통해 운영자는 원하는 유형의 문제만 빠르게 찾아볼 수 있습니다.
+
+  
+3. **경량 운영**  
+   - ✅ `Bash`, `Cron`, `Awk` 만을 사용하여 구현되므로 별도의 로그 수집 에이전트(Filebeat, Fluentd 등)를 설치할 필요가 없습니다.  
+   - 최소한의 리소스로 동작하기 때문에 운영 환경에 부담을 주지 않으면서도 효과적인 로그 관리가 가능합니다.
+     
 
 👉 요약하면, 이 프로젝트의 목적은 **컨테이너 운영 환경에서 오류 로그를 자동으로 수집하고,  
 중복 없이, 유형별로 구조화하여 빠른 문제 분석과 대응을 가능하게 하는 것**입니다.
 
+<br>
 
 ---
 
@@ -48,6 +55,7 @@
 * ✅ **리포트 자동 생성** (매일 지정된 시간에 키워드별 분리)
 * ✅ **실시간 모니터링 지원**
 * ✅ **경량 운영** (Bash + Cron + Awk 만 사용)
+<br>
 
 ---
 
@@ -64,12 +72,14 @@
 git clone https://github.com/<username>/docker-log-project.git
 cd docker-log-project
 ```
+<br>
 
 ### 2. 실행 권한 부여
 
 ```bash
 chmod +x container-log-collect.sh container-log-report.sh monitor.sh
 ```
+<br>
 
 ### 3. 크론탭 등록
 
@@ -86,6 +96,7 @@ crontab -e
 # 매일 12:20에 리포트 생성
 20 12 * * * /home/ubuntu/docker-log-project/container-log-report.sh
 ```
+<br>
 
 ---
 
@@ -182,6 +193,7 @@ reports/2025-09-06/
 ```bash
 docker run --name noimg-test doesnotexist:latest
 ```
+<br>
 
 ### 2. 메모리 제한 → OOMKilled
 
@@ -189,6 +201,7 @@ docker run --name noimg-test doesnotexist:latest
 docker run -m 50m --memory-swap 50m --name oom-test \
   busybox sh -c "dd if=/dev/zero of=/dev/null bs=100M"
 ```
+<br>
 
 ### 3. 강제 종료 → Exit(137)
 
@@ -196,6 +209,7 @@ docker run -m 50m --memory-swap 50m --name oom-test \
 docker run -d --name crash-nginx nginx
 docker kill -s SIGKILL crash-nginx
 ```
+<br>
 
 ---
 
@@ -205,6 +219,8 @@ docker kill -s SIGKILL crash-nginx
 
 * 초기에 `docker logs` 사용 시, 실행할 때마다 전체 로그가 중복 수집되는 문제가 있었음.
 
+<br>
+
 ### 해결 방법
 
 * **컨테이너별 offset 관리**:
@@ -212,3 +228,29 @@ docker kill -s SIGKILL crash-nginx
   * 각 컨테이너의 로그 파일 크기(바이트 단위)를 기록
   * 다음 실행 시 해당 offset 이후만 수집
   * → 중복 없는 로그 수집 가능
+
+<br>
+
+
+**✏️CODE**
+
+- 현재 파일 크기 기록
+ ```
+offset_file="$OFFSET_DIR/${fullid}.offset"
+
+    if [ ! -f "$offset_file" ]; then
+        wc -c < "$clog" > "$offset_file"
+    fi
+
+    last_offset=$(cat "$offset_file")
+
+```
+
+- offset 갱신
+```
+
+    wc -c < "$clog" > "$offset_file"
+
+```
+
+
