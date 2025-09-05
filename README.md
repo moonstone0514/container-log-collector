@@ -228,30 +228,74 @@ reports/2025-09-06/
 
 ## 🧪 테스트 방법
 
-### 1. 잘못된 이미지 실행 → 이미지 에러
-
-```bash
-docker run --name noimg-test doesnotexist:latest
-```
 <br>
 
-### 2. 메모리 제한 → OOMKilled
+컨테이너 오류 로그 수집 기능을 검증하기 위해 **의도적으로 오류 상황을 발생**시킬 수 있습니다.  
+아래 예시들은 `logs/` 와 `reports/` 디렉토리에 에러 로그가 잘 쌓이는지 확인하기 위한 테스트 시나리오입니다.
 
-```bash
+<br>
+
+
+### 1. 잘못된 이미지 실행 → 이미지 Pull 에러
+존재하지 않는 이미지를 실행하여, 레지스트리 인증 실패/이미지 없음 에러를 발생시킵니다.
+
+```
+docker run --name noimg-test doesnotexist:latest
+
+```
+- 기대 로그
+   - unauthorized: authentication required
+   - pull access denied
+- 리포트 위치
+   - reports/<오늘날짜>/Error.txt
+     
+<br>
+
+### 2. 메모리 제한 초과 → OOMKilled
+메모리를 강제로 소비해 컨테이너가 Out-Of-Memory(OOM)로 종료되도록 만듭니다.
+
+```
 docker run -m 50m --memory-swap 50m --name oom-test \
   busybox sh -c "dd if=/dev/zero of=/dev/null bs=100M"
 ```
+- 기대 로그
+   - OOMKilled
+   - 종료 상태 코드 137
+- 리포트 위치
+   - reports/<오늘날짜>/OOMKilled.txt
+
 <br>
 
 ### 3. 강제 종료 → Exit(137)
+정상 실행 중인 컨테이너를 강제로 SIGKILL 시그널로 종료시킵니다.
 
-```bash
+```
 docker run -d --name crash-nginx nginx
 docker kill -s SIGKILL crash-nginx
 ```
+- 기대 로그
+   - crash, exited with code 137
+- 리포트 위치
+   - reports/<오늘날짜>/Failed.txt 또는 CrashLoopBackOff.txt
+ 
+<br>
+
+### ✅ 테스트 후 확인 방법
+
+```
+# 오늘자 에러 리포트 디렉토리 확인
+ls reports/$(date +%F)
+
+# 특정 키워드별 에러 로그 확인
+cat reports/$(date +%F)/Error.txt
+cat reports/$(date +%F)/OOMKilled.txt
+```
+**테스트가 끝나면 logs/와 reports/에 발생한 오류가 자동 기록·분류되는 것을 확인할 수 있습니다.**
+
 <br>
 
 ---
+
 
 ## 🛠️ 트러블슈팅
 
