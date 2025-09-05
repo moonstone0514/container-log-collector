@@ -1,4 +1,4 @@
-# 🐳 Docker Log Collector (Bash + Cron + Awk)
+# 🐳 Docker Log Collector
 
 ---
 
@@ -60,7 +60,40 @@
 ---
 
 ## 📂 디렉토리 구조
-<img width="886" height="727" alt="image" src="https://github.com/user-attachments/assets/8181bfbd-e7a5-4d6d-8aea-857f5ba50d4a" />
+<img width="893" height="708" alt="image" src="https://github.com/user-attachments/assets/2f9df981-8368-4000-9a35-a24b7da9b9bc" />
+
+
+
+### 🟢 스크립트
+- **`container-log-collect.sh`**  
+  - 실행 중인 컨테이너 로그를 주기적으로 수집하여 `logs/` 디렉토리에 저장  
+  - 컨테이너별로 날짜 단위 로그 파일 생성  
+
+- **`container-log-report.sh`**  
+  - 하루치 수집된 로그를 통합하고, 주요 에러 패턴(`Error`, `Failed`, `CrashLoopBackOff`, `OOMKilled`)을 자동 분류  
+  - 결과를 `reports/YYYY-MM-DD/` 아래에 리포트 파일로 저장  
+
+- **`monitor.sh`**  
+  - `tail -F` 기반으로 로그를 실시간 모니터링  
+  - 테스트 및 장애 대응 시 즉각적으로 로그 확인 가능  
+
+<br>
+
+### 📁 디렉토리
+- **`logs/`**  
+  - 수집된 컨테이너 로그 저장소  
+  - `*-all-YYYY-MM-DD.log` : 컨테이너별 전체 로그  
+  - `*-error-YYYY-MM-DD.log` : 에러만 추출한 로그  
+
+- **`offsets/`**  
+  - 각 컨테이너별 로그 수집 상태를 기록하는 내부 관리 디렉토리  
+
+- **`reports/`**  
+  - 운영자가 확인할 수 있는 에러 리포트 저장소  
+  - `all-errors.log` : 하루치 에러 전체  
+  - `Error.txt`, `Failed.txt`, `CrashLoopBackOff.txt`, `OOMKilled.txt` : 유형별 분류 리포트  
+
+<br><br>
 
 ---
 
