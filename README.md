@@ -59,6 +59,13 @@
 
 ---
 
+## 🗺️프로젝트 구성도
+
+<img width="3004" height="1968" alt="image" src="https://github.com/user-attachments/assets/a14347ac-e408-482d-8c40-2f110c1912f9" />
+
+
+---
+
 ## 📂 디렉토리 구조
 <img width="893" height="708" alt="image" src="https://github.com/user-attachments/assets/2f9df981-8368-4000-9a35-a24b7da9b9bc" />
 
@@ -102,7 +109,7 @@
 ### 1. 저장소 클론
 
 ```bash
-git clone https://github.com/<username>/docker-log-project.git
+git clone https://github.com/moonstone0514/docker-log-project.git
 cd docker-log-project
 ```
 <br>
