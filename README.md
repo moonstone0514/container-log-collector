@@ -2,6 +2,16 @@
 
 ---
 
+
+### 👥 Team Members
+| 강한솔 | 김문석 |
+| :---: | :---: |
+| [<img width="160px" src="https://github.com/kkangsol.png" />](https://github.com/kkangsol) | [<img width="160px" src="https://github.com/moonstone0514.png" />](https://github.com/moonstone0514) | 
+| [@kkangsol](https://github.com/kkangsol) | [@moonstone0514](https://github.com/moonstone0514) |
+<br>
+
+---
+
 ## 🎯 프로젝트 목적
 
 현대 서비스 환경에서는 수십~수백 개의 컨테이너가 동시에 실행되며,  
