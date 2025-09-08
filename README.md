@@ -1,4 +1,5 @@
 # 🐳 Docker Log Collector
+### 다중 컨테이너 관리를 위한 로그 데이터 수집·분석 시스템
 
 ---
 
@@ -14,8 +15,8 @@
 
 ## 🎯 프로젝트 목적
 
-제가 직접 여러 개의 컨테이너를 동시에 운영하다 보니,  
-생각보다 컨테이너들이 자주 꺼지거나, 제가 알지 못하는 사이에 종료되는 경우가 많았습니다.  
+여러 개의 컨테이너를 동시에 운영하다 보니,  
+컨테이너들이 자주 중지되거나, 알지 못하는 사이에 종료되는 경우가 많았습니다.  
 
 하지만 Docker 기본 로그만으로는:
 - 컨테이너별로 흩어져 있어 한눈에 보기 어렵고
@@ -35,7 +36,7 @@
 2. **에러 패턴별 분류**  
    - `Error`, `Failed`, `CrashLoopBackOff`, `OOMKilled` 등 주요 패턴을 자동으로 필터링해  
      별도 리포트 파일로 정리합니다.  
-   - 이를 통해 운영자는 원하는 유형의 문제만 빠르게 찾아볼 수 있습니다.
+   - 운영자는 원하는 유형의 문제만 빠르게 찾아볼 수 있습니다.
 
   
 3. **경량 운영**  
@@ -56,7 +57,7 @@
 * ✅ **에러 패턴 필터링** (`error`, `failed`, `crash`, `oomkilled`)
 * ✅ **리포트 자동 생성** (매일 지정된 시간에 키워드별 분리)
 * ✅ **실시간 모니터링 지원**
-* ✅ **경량 운영** (Bash + Cron + Awk 만 사용)
+* ✅ **경량 운영** (Bash, Cron, Awk 만 사용)
 <br>
 
 ---
@@ -68,12 +69,12 @@
 
 ---
 
-## 📂 디렉토리 구조
+## 📂 프로젝트 수행 구조
 <img width="893" height="708" alt="image" src="https://github.com/user-attachments/assets/2f9df981-8368-4000-9a35-a24b7da9b9bc" />
 
 
 
-### 🟢 스크립트
+### 🟢 쉘 스크립트
 - **`container-log-collect.sh`**  
   - 실행 중인 컨테이너 로그를 주기적으로 수집하여 `logs/` 디렉토리에 저장  
   - 컨테이너별로 날짜 단위 로그 파일 생성  
@@ -90,7 +91,8 @@
 
 ### 📁 디렉토리
 - **`logs/`**  
-  - 수집된 컨테이너 로그 저장소  
+  - 수집된 컨테이너 로그 저장소 '
+  - awk를 활용한 유의미한 데이터 추출출 
   - `*-all-YYYY-MM-DD.log` : 컨테이너별 전체 로그  
   - `*-error-YYYY-MM-DD.log` : 에러만 추출한 로그  
 
@@ -106,7 +108,7 @@
 
 ---
 
-## 🚀 설치 및 실행
+## 🚀프로젝트 설치 및 실행
 
 ### 1. 저장소 클론
 
@@ -137,6 +139,30 @@ crontab -e
 
 # 매일 12:20에 리포트 생성
 20 12 * * * /home/ubuntu/docker-log-project/container-log-report.sh
+```
+
+
+
+### 4. 로그파일 확인
+
+로그는 `logs/` 디렉토리에 일자별로 생성됩니다.  
+
+```bash
+ls logs/
+````
+
+예시:
+
+```
+container-error-2025-09-08.log
+container-info-2025-09-08.log
+container-warning-2025-09-08.log
+```
+
+실시간 로그 확인:
+
+```bash
+tail -f logs/container-error-$(date +%F).log
 ```
 <br>
 
@@ -202,17 +228,6 @@ for err in "${errors[@]}"; do
     grep -i "$err" "$DST/all.log" > "$DST/${err}.txt"
 done
 ```
-
----
-
-## 👀 실시간 모니터링 (`monitor.sh`)
-
-```bash
-#!/bin/bash
-tail -F logs/*-all-$(date +%F).log
-```
-<img width="861" height="209" alt="image" src="https://github.com/user-attachments/assets/a9f7e449-a20c-4f70-b674-571e7bee2c48" />
-
 ---
 
 ## 📊 리포트 결과 예시
@@ -225,6 +240,17 @@ reports/2025-09-06/
 ├── CrashLoopBackOff.txt
 └── OOMKilled.txt
 ```
+---
+
+## 👀 실시간 모니터링 (`monitor.sh`)
+
+```bash
+#!/bin/bash
+tail -F logs/*-all-$(date +%F).log
+```
+<img width="861" height="209" alt="image" src="https://github.com/user-attachments/assets/a9f7e449-a20c-4f70-b674-571e7bee2c48" />
+
+
 
 ---
 
@@ -238,7 +264,7 @@ reports/2025-09-06/
 <br>
 
 
-### 1. 잘못된 이미지 실행 → 이미지 Pull 에러
+### 1. 존재하지 않는 이미지 Pull 시 에러 발생생
 존재하지 않는 이미지를 실행하여, 레지스트리 인증 실패/이미지 없음 에러를 발생시킵니다.
 
 ```
@@ -292,7 +318,7 @@ ls reports/$(date +%F)
 cat reports/$(date +%F)/Error.txt
 cat reports/$(date +%F)/OOMKilled.txt
 ```
-**테스트가 끝나면 logs/와 reports/에 발생한 오류가 자동 기록·분류되는 것을 확인할 수 있습니다.**
+**테스트가 끝나면, crontab을 통해 logs/와 reports/에 발생한 오류가 주기적으로 자동 기록·분류되는 것을 확인할 수 있습니다**
 
 <br>
 
@@ -318,7 +344,7 @@ cat reports/$(date +%F)/OOMKilled.txt
 <br>
 
 
-**✏️CODE**
+**✏️쉘 스크립트**
 
 - 현재 파일 크기 기록
  ```
@@ -338,5 +364,16 @@ offset_file="$OFFSET_DIR/${fullid}.offset"
     wc -c < "$clog" > "$offset_file"
 
 ```
+
+## 📝 고찰
+
+컨테이너 환경에서는 예상치 못한 중지나 오류가 빈번하게 발생하므로,  
+이를 자동으로 기록하고 분석하는 체계가 운영 안정성에 큰 도움이 됨을 알 수 있었다.  
+이번 프로젝트는 Docker 수준에서의 기본적인 자동화를 실현했으며,  
+앞으로 Kubernetes 환경으로 확장한다면 중앙집중식 로깅과 모니터링으로 발전시킬 수 있을 것이다.  
+
+특히 단순한 로그 수집을 넘어서 알림, 대시보드 시각화와 연계한다면  
+서비스 장애 대응 속도를 한층 더 높일 수 있을 것으로 기대된다.  
+
 
 
